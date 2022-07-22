@@ -1,0 +1,77 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  labels:
+    app: {{ .Values.jobs.leaderboard.name }}
+  name: {{ .Values.jobs.leaderboard.name }}
+spec:
+  schedule: "00 12 * * *"
+  successfulJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          {{- with .Values.image.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+          - image: "{{ .Values.image.repository }}/{{ .Values.jobs.leaderboard.image }}:{{ .Values.jobs.leaderboard.imagetag | default .Chart.AppVersion }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            name: {{ .Values.jobs.leaderboard.name }}
+            env:
+            - name: ENV
+              value: "{{ .Values.env }}"
+            - name: START_SUB
+              value: "start-sub-{{ .Values.env }}"
+            - name: LAKE_SUB
+              value: "lake-sub-{{ .Values.env }}"
+            - name: SEA_SUB
+              value: "sea-sub-{{ .Values.env }}"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/secrets/service_account.json"
+            - name: GCP_PROJECT
+              value: "{{ .Values.project }}"
+            - name: GCP_BUCKET_NAME
+              value: "{{ .Values.env }}-ai-open-competition-leaderboard"
+            - name: COMPETITION
+              value: "{{ .Values.competition }}"
+            - name: SLACK_PUBLIC_CHANNEL
+              value: "{{ .Values.jobs.leaderboard.slack_public_channel }}"
+            - name: OFFICIAL_START_DATE
+              value: "{{ .Values.jobs.leaderboard.official_start_date }}"
+            - name: OFFICIAL_END_DATE
+              value: "{{ .Values.jobs.leaderboard.official_end_date }}"
+            - name: SLACK_BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: slack-tokens
+                  key: token
+            - name: DB_HOST
+              value: "cloudsql-proxy-service"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: username
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: database
+            - name: LOGGER_SEND_LEADERBOARD
+              value: "{{ .Values.env }}-leaderboard"
+            volumeMounts:
+            - name: sa-secret-vol
+              mountPath: /secrets/
+              readOnly: true
+          restartPolicy: OnFailure
+          volumes:
+          - name: sa-secret-vol
+            secret:
+              secretName: {{ .Values.secret }}

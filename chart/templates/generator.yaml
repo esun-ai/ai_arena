@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployments.generator.name }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.deployments.controller.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.generator.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.generator.name }}
+    spec:
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+      - name: {{ .Values.deployments.generator.name }}
+        image: "{{ .Values.image.repository }}/{{ .Values.deployments.generator.image }}:{{ .Values.deployments.generator.imagetag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+          requests:
+            cpu: "100m"
+          limits:
+            cpu: "500m"
+        env:
+        - name: ENV
+          value: "{{ .Values.env }}"
+        - name: LOGGER_NAME
+          value: "{{ .Values.deployments.generator.name }}-{{ .Values.env }}"
+        - name: GENERATOR_TOPIC
+          value: "generator-{{ .Values.env }}"
+        - name: QUESTION_LIMIT
+          value: ""
+        - name: RATE
+          value: "{{ .Values.deployments.generator.rate }}"
+        - name: PROJECT_ID
+          value: "{{ .Values.project }}"
+        - name: START_TOPIC
+          value: "start-{{ .Values.env }}"
+        - name: LAKE_TOPIC
+          value: "lake-{{ .Values.env }}"
+        - name: SEA_TOPIC
+          value: "sea-{{ .Values.env }}"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/service_account.json"
+        - name: DB_HOST
+          value: "cloudsql-proxy-service"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: database
+        volumeMounts:
+        - name: sa-secret-vol
+          mountPath: /secrets/
+          readOnly: true
+      volumes:
+      - name: sa-secret-vol
+        secret:
+          secretName: {{ .Values.secret }}
