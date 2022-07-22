@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployments.controller.name }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.deployments.controller.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.controller.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.controller.name }}
+    spec:
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: sa-secret-vol
+          secret:
+            secretName: "{{ .Values.secret }}"
+      containers:
+        - name: {{ .Values.deployments.controller.name }}
+          image: "{{ .Values.image.repository }}/{{ .Values.deployments.controller.image }}:{{ .Values.deployments.controller.imagetag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            - name: sa-secret-vol
+              mountPath: /secrets/
+              readOnly: true
+          env:
+            - name: LOGGER_NAME
+              value: "{{ .Values.deployments.controller.name }}-{{ .Values.env }}"
+            - name: ENV
+              value: "{{ .Values.env }}"
+            - name: PROJECT_ID
+              value: "{{ .Values.project }}"
+            - name: START_TOPIC
+              value: "start-{{ .Values.env }}"
+            - name: LAKE_TOPIC
+              value: "lake-{{ .Values.env }}"
+            - name: SEA_TOPIC
+              value: "sea-{{ .Values.env }}"
+            - name: GENERATOR_TOPIC
+              value: "generator-{{ .Values.env }}"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/secrets/service_account.json"
+            - name: DB_HOST
+              value: "cloudsql-proxy-service"
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: username
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-sql-secret
+                  key: database
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      

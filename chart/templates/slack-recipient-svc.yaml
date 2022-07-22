@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.deployments.slack_recipient.name }}-service
+spec:
+  selector:
+    app: {{ .Values.deployments.slack_recipient.name }}
+  type: LoadBalancer
+  loadBalancerIP: YOUR_loadBalancerIP
+  ports:
+  - port: 80
+    targetPort: 3000

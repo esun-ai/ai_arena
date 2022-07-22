@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployments.slack_recipient.name }}
+  labels:
+    app: slack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.slack_recipient.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.slack_recipient.name }}
+    spec:
+      containers:
+      - name: {{ .Values.deployments.slack_recipient.name }}
+        image: gcr.io/if-aicompetition/{{ .Values.deployments.slack_recipient.name }}:43ef0b2
+
+        ports:
+        - containerPort: 80
+        imagePullPolicy: Always
+        env:
+        - name: LOGGER_NAME
+          value: "{{ .Values.deployments.slack_recipient.name }}_{{ .Values.env }}"
+        - name: SLACK_SIGN_SECRET
+          valueFrom: 
+            secretKeyRef: 
+                name: slack-tokens
+                key: slack_dev_signing_token
+        - name: SLACK_BOT_TOKEN
+          valueFrom: 
+            secretKeyRef: 
+                name: slack-tokens
+                key: token
+        - name: env
+          value: "{{ .Values.env }}"
+        - name: COMPETITION
+          value: "{{ .Values.competition }}"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/service_account.json"
+        volumeMounts:
+        - name: sa-secret-vol
+          mountPath: /secrets/
+          readOnly: true
+      volumes:
+      - name: sa-secret-vol
+        secret:
+          secretName: "{{ .Values.secret }}"
+      imagePullSecrets:
+      - name: gcr-io-secret

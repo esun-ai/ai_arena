@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.jobs.db_init.name }}
+spec:
+  ttlSecondsAfterFinished: 180
+  template:
+    spec:
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: OnFailure
+      containers:
+      - name: {{ .Values.jobs.db_init.name }}
+        image: "{{ .Values.image.repository }}/{{ .Values.jobs.db_init.image }}:{{ .Values.jobs.db_init.imagetag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["python3", "init_db.py"]
+        env:
+        - name: file_name
+          value: init-db.sql
+        - name: LOGGER_NAME
+          value: "{{ .Values.jobs.db_init.name }}-{{ .Values.env }}"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/service_account.json"
+        - name: DB_HOST
+          value: "cloudsql-proxy-service"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: database
+        volumeMounts:
+        - name: sa-secret-vol
+          mountPath: /secrets/
+          readOnly: true
+      volumes:
+      - name: sa-secret-vol
+        secret:
+          secretName: "{{ .Values.secret }}"

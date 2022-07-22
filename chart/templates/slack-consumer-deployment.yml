@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployments.slack_consumer.name }}
+  labels:
+    app: slack
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.deployments.controller.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.slack_consumer.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.slack_consumer.name }}
+    spec:
+      containers:
+      - name: {{ .Values.deployments.slack_consumer.name }}
+        image: "{{ .Values.image.repository }}/{{ .Values.deployments.slack_consumer.image }}:{{ .Values.deployments.slack_consumer.imagetag | default .Chart.AppVersion }}"
+        ports:
+        - containerPort: 80
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        env:
+        - name: DB_HOST
+          value: "cloudsql-proxy-service"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: database
+        - name: LOGGER_NAME
+          value: "{{ .Values.deployments.slack_consumer.name }}_{{ .Values.env }}"
+        - name: salt
+          value: "{{ .Values.deployments.slack_consumer.salt }}"
+        - name: SLACK_BOT_TOKEN
+          valueFrom: 
+            secretKeyRef: 
+                name: slack-tokens
+                key: token       
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/service_account.json"
+        - name: COMPETITION
+          value: "{{ .Values.competition }}"
+        - name: RESET_URL
+          value: ""
+        - name: CREATE_SUB_URL
+          value: "http://controller-svc.default/create_sub"
+        - name: VERIFY_URL
+          value: "http://controller-svc.default/verify_url"
+        - name: PROJECT_ID
+          value: "{{ .Values.project }}"
+        - name: TOPIC_ID
+          value: "lake-{{ .Values.env }}"
+        - name: ENV
+          value: "{{ .Values.env }}"
+        - name: LOG_BUCKET_NAME
+          value: "{{ .Values.env }}-team-log-bucket"
+        - name: LOG_START_DATE
+          value: "2021-05-01"
+        volumeMounts:
+        - name: sa-secret-vol
+          mountPath: /secrets/
+          readOnly: true
+      volumes:
+      - name: sa-secret-vol
+        secret:
+          secretName: "{{ .Values.secret }}"
+      imagePullSecrets:
+      - name: gcr-io-secret

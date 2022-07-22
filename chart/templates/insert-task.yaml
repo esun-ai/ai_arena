@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.jobs.insert_task.name }}
+spec:
+  schedule: {{ .Values.jobs.insert_task.schedule }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          {{- with .Values.image.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          containers:
+          - name: {{ .Values.jobs.insert_task.name }}
+            image: "{{ .Values.image.repository }}/{{ .Values.jobs.insert_task.image }}:{{ .Values.jobs.insert_task.imagetag | default .Chart.AppVersion }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            command: ["python", "daily_job.py", "-e", "{{ .Values.env }}", "-s", "controller-svc.default", "-i", "/get_teams"]
+            env:
+            - name: ENV
+              value: "{{ .Values.env }}"
+            - name: PROJECT_ID
+              value: "{{ .Values.project }}"
+            - name: LOGGER_NAME
+              value: "cronjob-{{ .Values.env }}"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/secrets/service_account.json"
+            volumeMounts:
+            - name: sa-secret-vol
+              mountPath: /secrets/
+              readOnly: true
+          volumes:
+          - name: sa-secret-vol
+            secret:
+              secretName: {{ .Values.secret }}
+          restartPolicy: OnFailure

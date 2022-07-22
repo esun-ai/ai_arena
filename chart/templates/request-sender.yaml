@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.deployments.request_sender.name }}
+  name: {{ .Values.deployments.request_sender.name }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.deployments.request_sender.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: {{ .Values.deployments.request_sender.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.deployments.request_sender.name }}
+    spec:
+      {{- with .Values.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+      containers:
+      - image: "{{ .Values.image.repository }}/{{ .Values.deployments.request_sender.image }}:{{ .Values.deployments.request_sender.imagetag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        name: "{{ .Values.deployments.request_sender.name }}"
+        resources:
+          requests:
+            cpu: "200m"
+          limits:
+            cpu: "300m"
+        command: ["python3", "main.py"]
+        env:
+        - name: trigger_next_topic
+          value: "controller-{{ .Values.env }}"
+        - name: retry_trigger_next
+          value: "{{ .Values.deployments.request_sender.retry }}"
+        - name: LOGGER_NAME 
+          value: "{{ .Values.deployments.request_sender.name }}"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/service_account.json"
+        - name: gen_api
+          value: "http://controller-svc.default/trigger_next"
+        - name: project_id
+          value: "{{ .Values.project }}"
+        - name: slack_url
+          value: "https://slack.com/api/chat.postMessage"
+        - name: ENV
+          value: "{{ .Values.env }}"
+        - name: gcp_sub_id
+          value: "sea-sub-{{ .Values.env }}"
+        - name: num_message
+          value: "{{ .Values.deployments.request_sender.message }}"
+        - name: max_worker
+          value: "{{ .Values.deployments.request_sender.message }}"
+        - name: call_client_timeout
+          value: "{{ .Values.deployments.request_sender.timeout }}"
+        - name: slack_bot_token 
+          valueFrom:
+            secretKeyRef:
+              name: slack-tokens
+              key: token
+        - name: DB_HOST
+          value: "cloudsql-proxy-service"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: cloud-sql-secret
+              key: database
+        volumeMounts:
+        - name: sa-secret-vol
+          mountPath: /secrets/
+          readOnly: true
+      volumes:
+      - name: sa-secret-vol
+        secret:
+          secretName: "{{ .Values.secret }}"
