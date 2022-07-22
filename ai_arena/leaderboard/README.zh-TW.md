@@ -12,4 +12,3 @@
 docker build -t gcr.io/{{YOUR_PROJECT}}/{{YOUR_IMAGE_NAME}}:{{YOUR_TAG}} -f ./Dockerfile .
 docker push gcr.io/{{YOUR_PROJECT}}/{{YOUR_IMAGE_NAME}}:{{YOUR_TAG}}
 ```
-https://github.com/Esun-DF-develop/ESUN_BOT_A/blob/refactor/doc/ai_arena/leaderboard/README.zh-TW.md
