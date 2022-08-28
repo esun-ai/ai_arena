@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 # Copyright (C) 2022  E.SUN BANK.
-# @Author: Guan-Yu Su
-# @Date: 2022/08
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
